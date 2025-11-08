@@ -13,8 +13,8 @@ Methods.LoadProject = function()
         local file = script:FindFirstChild(name)
         assert(file,"Project could not be loaded, file  '"..name.."' does not exist.")
         
-        local type = typeof(file)
-        if type == "Script" or type =="LocalScript" then
+        local ftype = typeof(file)
+        if ftype == "Script" or ftype =="LocalScript" then
             file.Enabled = true
         end
 
@@ -36,8 +36,8 @@ Methods.UnloadProject = function()
             continue
         end
 
-        local type = typeof(file)
-        if type == "Script" or type =="LocalScript" then
+        local ftype = typeof(file)
+        if ftype == "Script" or ftype =="LocalScript" then
             file.Enabled = false
         end
 
