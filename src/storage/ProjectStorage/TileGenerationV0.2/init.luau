@@ -1,5 +1,5 @@
 local Project = {
-    ["TileGeneration"] = game.ServerScriptService
+    ["TileGeneration"] = game.StarterPlayer.StarterPlayerScripts
 }
 
 
@@ -56,7 +56,7 @@ end
 
 Methods.RemoveFile = function(param: string | Object) 
     local obj = param
-    if typeof(param) == "string" then
+    if typeof(param) == "string" then -- maybe check for its destination location too if its there?
         obj = script:FindFirstChild(param)
         assert(obj,"Could not find and remove file matching name: '"..param.."'")
     end
