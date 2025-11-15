@@ -14,12 +14,12 @@ folder.Parent = workspace
 --west v north connection? but that may lead to too much open space. Perhaps somehow keep track if a chunk can be reached
 --and if generation is generating a chunks last remaining open side, force a connection?
 
---also dynamic chunk loading might be better, right now we just check over every chunk in range to load it, 
+--also dynamic chunk loading might be better, right now we just check over every chunk in range to load it,
 --but considering we load a block, and u can only go to cardinal directions,
 --we can just load a column or row every time someone moves a chunk over.
 
 --Configurable parameters
-local loadedChunkRange = 6
+local loadedChunkRange = 4
 local seed = 1
 local chunkSize = 16 --16x16 10x10 tiles
 --Also configurable as long as the corresponding tile rooms are updated.
@@ -70,7 +70,7 @@ local function getChunksToUnload(currentChunk: table | nil): table
 end
 
 --Finds all chunks that are in both tables and returns the first table without those chunks. C = A - (A n B) , return C
-local function removeIntersectingChunks(A: table, B: table): table
+--[[local function removeIntersectingChunks(A: table, B: table): table
 	local C = {}
 
 	for _, a in A do
@@ -86,7 +86,8 @@ local function removeIntersectingChunks(A: table, B: table): table
 	end
 
 	return C
-end
+end]]
+--
 
 local function findChunk(chunkTable: table, chunk: table)
 	for indx, element in chunkTable do
@@ -107,8 +108,8 @@ local function getChunksToLoad(currentChunk: table | nil): table
 
 	--ahh linear search for chunks? Ehh no interest in implementing binary search . and sorting
 
-	for i = -loadedChunkRange, loadedChunkRange do
-		for j = -loadedChunkRange, loadedChunkRange do
+	for i = (-loadedChunkRange + currentChunk[1]), (loadedChunkRange + currentChunk[1]) do
+		for j = (-loadedChunkRange + currentChunk[2]), (loadedChunkRange + currentChunk[2]) do
 			if not findChunk(loadedChunks, { i, j }) then
 				table.insert(chunksToLoad, { i, j })
 			end
@@ -134,29 +135,32 @@ local chunkLoadingThread = coroutine.wrap(function()
 
 		local currentPosition = humRootPart.Position
 		local currentChunk = {
-			math.ceil(currentPosition.X / (chunkSize * tileSize)),
-			math.ceil(currentPosition.Z / (chunkSize * tileSize)),
+			math.floor(currentPosition.X / (chunkSize * tileSize)),
+			math.floor(currentPosition.Z / (chunkSize * tileSize)),
 		}
 		if lastChunk[1] == currentChunk[1] and lastChunk[2] == currentChunk[2] then
 			continue
 		end
-        
-		lastChunk = currentChunk
+
+		local hasMoved = not (lastChunk[1] == currentChunk[1] and lastChunk[2] == currentChunk[2])
 
 		--now the madness descends
 
-
-        --we can honestly just add or remove a row/column when someone moves a chunk over. 
+		--we can honestly just add or remove a row/column when someone moves a chunk over.
 		--how do we figure every chunk to unload and which to load based on range?
-		local toUnload = getChunksToUnload()
-		for _, chunk in toUnload do
-			asyncUnloadChunk(chunk[1], chunk[2])
-		end
+		if hasMoved then
+			lastChunk = currentChunk
 
-		--now how do we figure out all chunks to load . . . , , ,
-		local toLoad = getChunksToLoad()
-		for _, chunk in toLoad do
-			asyncLoadChunk(chunk[1], chunk[2])
+			local toUnload = getChunksToUnload()
+			for _, chunk in toUnload do
+				asyncUnloadChunk(chunk[1], chunk[2])
+			end
+
+			
+			local toLoad = getChunksToLoad()
+			for _, chunk in toLoad do
+				asyncLoadChunk(chunk[1], chunk[2])
+			end
 		end
 	end
 end)
