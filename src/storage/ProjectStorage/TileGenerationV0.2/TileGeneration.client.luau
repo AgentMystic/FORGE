@@ -7,16 +7,6 @@ folder.Parent = workspace
 
 --may god be with me.
 
---TODO section
---i have realized the possibility exists that for any group in chunks, using a symetric edge algorithm,
---we may encounter them enclosed, as chunks have the possibility to not be connected.
---thus creating clusters of chunks that may be isolated, even with the player in them. always guarantee
---west v north connection? but that may lead to too much open space. Perhaps somehow keep track if a chunk can be reached
---and if generation is generating a chunks last remaining open side, force a connection?
-
---also dynamic chunk loading might be better, right now we just check over every chunk in range to load it,
---but considering we load a block, and u can only go to cardinal directions,
---we can just load a column or row every time someone moves a chunk over.
 
 --Configurable parameters
 local loadedChunkRange = 4
@@ -36,13 +26,17 @@ local player = players.LocalPlayer
 
 --procedural infinity
 
-local function syncLoadChunk(x: IntValue, y: IntValue) end
+local function getKey(chunk:table): string
+	return tostring(chunk[1]) +","+ tostring(chunk[2])
+end
 
+local function syncLoadChunk(x: IntValue, y: IntValue) end
+	table.insert(loadedChunks)
 local function asyncLoadChunk(x: IntValue, y: IntValue)
 	local thread = coroutine.wrap(syncLoadChunk)
 	thread(x, y)
 end
-
+--consider accepting chunk x y, or changing key method
 local function syncUnloadChunk(x: IntValue, y: IntValue) end
 
 local function asyncUnloadChunk(x: IntValue, y: IntValue)
@@ -87,7 +81,7 @@ end
 
 	return C
 end]]
---
+
 
 local function findChunk(chunkTable: table, chunk: table)
 	for indx, element in chunkTable do
