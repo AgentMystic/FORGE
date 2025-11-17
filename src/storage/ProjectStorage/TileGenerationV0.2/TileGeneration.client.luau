@@ -1,6 +1,6 @@
 --by mys.tic
 print("Tile Generation Started!!!!!")
-
+task.wait(1)
 local folder = Instance.new("Folder")
 folder.Name = "ChunkGeneration"
 folder.Parent = workspace
@@ -10,7 +10,7 @@ folder.Parent = workspace
 --Configurable parameters
 local loadedChunkRange = 3
 local seed = 1
-local chunkSize = 16 --16x16 10x10 tiles
+local chunkSize = 8 --16x16 10x10 tiles
 --Also configurable as long as the corresponding tile rooms are updated.
 local tileSize = 10 --studs
 
@@ -51,7 +51,7 @@ local defaultTiles = {
 --procedural infinity
 
 local function getKey(x, y): string
-	return tostring(x) + "," + tostring(y)
+	return tostring(x) .. "," .. tostring(y)
 end
 
 local function getChunkSeed(x, y)
@@ -67,6 +67,7 @@ local function findPositionTable(a: table, positionTable: table)
 		if element[1] == positionTable[1] and element[2] == positionTable[2] then
 			return indx
 		end
+		task.wait() --temporary cause execution time is being exhausted.
 	end
 	return false
 end
@@ -78,10 +79,10 @@ local function getOwnConnections(x, y)
 		["West"] = nil,
 	}
 	if OwnRandom:NextNumber() < 0.4 then
-		map["North"] = OwnRandom:NextInteger(2, 15)
+		map["North"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
 	if OwnRandom:NextNumber() < 0.4 then
-		map["West"] = OwnRandom:NextInteger(2, 15)
+		map["West"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
 
 	return map
@@ -97,10 +98,10 @@ local function getAllConnections(x, y)
 	local OwnRandom = Random.new(getChunkSeed(x, y))
 
 	if OwnRandom:NextNumber() < 0.4 then
-		map["North"] = OwnRandom:NextInteger(2, 15)
+		map["North"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
 	if OwnRandom:NextNumber() < 0.4 then
-		map["West"] = OwnRandom:NextInteger(2, 15)
+		map["West"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
 	map["South"] = getOwnConnections(x, y - 1)["North"]
 	map["East"] = getOwnConnections(x + 1, y)["West"]
@@ -108,21 +109,20 @@ local function getAllConnections(x, y)
 	return map
 end
 
-local function buildChunk(destination, chunk, chunkMap) 
-	for x = 1,chunkSize do
-		for y = 1,chunkSize do
-			if chunkMap[x][y]["Type"] == "Hallway" then
+local function buildChunk(destination, chunk, chunkMap)
+	for x = 1, chunkSize do
+		for y = 1, chunkSize do
+			if chunkMap[x][y] and chunkMap[x][y]["type"] == "Hallway" then
 				local part = Instance.new("Part")
 				part.Anchored = true
-				part.Size = Vector3.new(tileSize,1,tileSize)
-				part.Position = chunkSize*tileSize*Vector3.new(chunk[1],0,chunk[2]) + Vector3.new(tileSize * x,10,tileSize*y)
+				part.Size = Vector3.new(tileSize, 1, tileSize)
+				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
+					+ Vector3.new(tileSize * x, 10, tileSize * y)
 				part.Parent = destination
-				part.Name = getKey(x,y)
+				part.Name = getKey(x, y)
 			end
 		end
 	end
-
-
 end
 
 local function mergePositionTables(a, b)
@@ -137,15 +137,25 @@ end
 --and the starting hallway, if we reach another connectionpoint we create the path that leads to it (influenced by the distance to other entry points, so not shortest per say).
 --Then we remove the original starting point and start pathing from the next connectionpoint, ignoring the already connected starting point.
 local function generateChunkHallways(connectionPoints: table)
-
 	local function calculateCost(x, y, z)
 		local cost = 0
 		for i = z, #connectionPoints do
 			local element = connectionPoints[i]
-			local localCost = math.root(math.square(x - element[1]) + math.square(y - element[2]))
+
+			local localCost = math.sqrt(math.pow(x - element[1], 2) + math.pow(y - element[2], 2))
 			cost += localCost
 		end
 		return cost
+	end
+
+	local function removeIntersecting(origin, altered) --b - (a n b)
+		local newTable = {}
+		for _, c in altered do
+			if not findPositionTable(origin, c) then
+				table.insert(newTable, c)
+			end
+		end
+		return newTable
 	end
 
 	local function getAdjacentTiles(x, y, z) --return in x,y,prevx,prevy,score format... | Z refers to the iteration.., so we don't calculate score based on previous starting tiles.
@@ -174,47 +184,54 @@ local function generateChunkHallways(connectionPoints: table)
 	local formedHallways = {}
 
 	for z = 1, #connectionPoints - 1 do
-		local currentStart = connectionPoints[1]
+		local currentStart = connectionPoints[z]
 		local searched = {} --{{x,y,prevx,prevy,(score)},{...}}
 		local possible = {} --{{x,y,prevx,prevy,score}
+		local adjacent = getAdjacentTiles(currentStart[1], currentStart[2], z)
 
-		local adjacent = getAdjacentTiles(currentStart[1], currentStart[2])
+		table.insert(searched, currentStart)
 		mergePositionTables(possible, adjacent)
 
 		while true do
 			local lowestCost = possible[1][5]
 			local candidate = possible[1]
+
 			for _, entry in possible do
 				if entry[5] < lowestCost then
 					lowestCost = entry[5]
 					candidate = entry
 				end
 			end
+			table.remove(possible, findPositionTable(possible, candidate))
 			
-			if findPositionTable(connectionPoints, { candidate[1], candidate[2] }) > z then --if we found an entry chunk not already connected.
+
+			local found = findPositionTable(connectionPoints, candidate)
+			if found and found > z then --if we found an entry chunk not already connected.
 				--ADD the hallway connection to the formedhallways
 				local path = candidate
 				local newHalls = {}
 				repeat
 					table.insert(newHalls, { path[1], path[2] })
-					path = searched[findPositionTable(searched,{path[3],path[4]})] -- find the previous tile, based on the prevx and prevy position/ 
+					path = searched[findPositionTable(searched, { path[3], path[4] })] -- find the previous tile, based on the prevx and prevy position/
 				until path[3] == nil --if there's no prevx this is the starting pos.
 				table.insert(newHalls, { path[1], path[2] })
 				mergePositionTables(formedHallways, newHalls)
+
 				break
 			end
 			table.insert(searched, candidate)
-			
-			adjacent = getAdjacentTiles(candidate[1], candidate[2])
+			adjacent = getAdjacentTiles(candidate[1], candidate[2], z)
+			adjacent = removeIntersecting(searched, adjacent)
 			mergePositionTables(possible, adjacent)
 		end
 	end
+	print(formedHallways)
 	return formedHallways
 end
 
-local function syncLoadChunk(x: IntValue, y: IntValue)
+local function syncLoadChunk(x: IntValue, y: IntValue) --we seem to start at chunk -1,-1
 	table.insert(loadedChunks, { x, y })
-
+	print("Started loading chunk " .. x .. " " .. y)
 	local chunkMap = {}
 	for t = 1, chunkSize do
 		chunkMap[t] = {}
@@ -226,24 +243,31 @@ local function syncLoadChunk(x: IntValue, y: IntValue)
 	chunkFolder.Name = key
 
 	local connections = getAllConnections(x, y)
+
 	--create the tiles in the chunkmap where the hallways are connecting to the adjacent chunks.
+	local startingHallways = {}
 	--North
-	chunkMap[connections["North"]][chunkSize] = defaultTiles["Hallway"]
+	if connections["North"] then
+		chunkMap[connections["North"]][chunkSize] = defaultTiles["Hallway"]
+		table.insert(startingHallways, { connections["North"], chunkSize })
+	end
 	--West
-	chunkMap[1][connections["West"]] = defaultTiles["Hallway"]
+	if connections["West"] then
+		chunkMap[1][connections["West"]] = defaultTiles["Hallway"]
+		table.insert(startingHallways, { 1, connections["West"] })
+	end
 	--South
-	chunkMap[connections["South"]][1] = defaultTiles["Hallway"]
+	if connections["South"] then
+		chunkMap[connections["South"]][1] = defaultTiles["Hallway"]
+		table.insert(startingHallways, { connections["South"], 1 })
+	end
 	--East
-	chunkMap[chunkSize][connections["East"]] = defaultTiles["Hallway"]
+	if connections["East"] then
+		chunkMap[chunkSize][connections["East"]] = defaultTiles["Hallway"]
+		table.insert(startingHallways, { chunkSize, connections["East"] })
+	end
 
 	local rand = Random.new(getChunkSeed(x, y))
-
-	local startingHallways = {
-		{ connections["North"], chunkSize },
-		{ 1, connections["West"] },
-		{ connections["South"], 1 },
-		{ chunkSize, connections["East"] },
-	}
 
 	local newHallway = { rand:NextInteger(2, chunkSize - 1), rand:NextInteger(2, chunkSize - 1) }
 	table.insert(startingHallways, newHallway)
@@ -253,20 +277,21 @@ local function syncLoadChunk(x: IntValue, y: IntValue)
 			table.insert(startingHallways, { rand:NextInteger(2, chunkSize - 1), rand:NextInteger(2, chunkSize - 1) })
 		end
 	end
-
-	local newHallwayTiles = generateChunkHallways(startingHallways)
-
-	for _,tile in newHallwayTiles do
+	local newHallwayTiles = generateChunkHallways(startingHallways) --issue is probably here.
+	for _, tile in newHallwayTiles do
 		chunkMap[tile[1]][tile[2]] = defaultTiles["Hallway"]
 	end
 
 	--hm for hallway generation. use some type of a* with bias towards any opening. and maybe randomly generate one or two other endpoints with bias near the middle to add randomness
 	--now we have all respective connections, with their position so now we generate the hallways. through rand
-	buildChunk(chunkFolder, {x,y},chunkMap) --build the chunks
+	buildChunk(chunkFolder, { x, y }, chunkMap) --build the chunks
 end
 
 --cant we syncunloadchunk = coroutine.wrap()
-local asyncLoadChunk = coroutine.wrap(syncLoadChunk)
+local function asyncLoadChunk(x, y)
+	local thread = coroutine.wrap(syncLoadChunk)
+	thread(x, y)
+end
 
 --consider accepting chunk x y, or changing key method
 local function syncUnloadChunk(x: IntValue, y: IntValue)
@@ -278,7 +303,10 @@ local function syncUnloadChunk(x: IntValue, y: IntValue)
 	table.remove(loadedChunks, findPositionTable(loadedChunks, { x, y }))
 end
 
-local asyncUnloadChunk = coroutine.wrap(syncUnloadChunk)
+local function asyncUnloadChunk(x, y)
+	local thread = coroutine.wrap(syncUnloadChunk)
+	thread(x, y)
+end
 
 local function getChunksToUnload(currentChunk: table | nil): table
 	if not currentChunk then
@@ -341,7 +369,7 @@ end
 --Create a thread to run the chunkloading routine.
 local chunkLoadingThread = coroutine.wrap(function()
 	while true do
-		task.wait(0.05)
+		task.wait(2)
 
 		local character = player.Character or nil
 		if not character then
@@ -363,7 +391,7 @@ local chunkLoadingThread = coroutine.wrap(function()
 		end
 
 		local hasMoved = not (lastChunk[1] == currentChunk[1] and lastChunk[2] == currentChunk[2])
-
+		print(hasMoved)
 		--now the madness descends
 
 		--we can honestly just add or remove a row/column when someone moves a chunk over.
@@ -377,6 +405,7 @@ local chunkLoadingThread = coroutine.wrap(function()
 			end
 
 			local toLoad = getChunksToLoad()
+			print(toLoad)
 			for _, chunk in toLoad do
 				asyncLoadChunk(chunk[1], chunk[2])
 			end
