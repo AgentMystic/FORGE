@@ -129,6 +129,16 @@ local function buildChunk(destination, chunk, chunkMap)
 	end
 end
 
+local function removeIntersecting(origin, altered) --b - (a n b)
+	local newTable = {}
+	for _, c in altered do
+		if not findPositionTable(origin, c) then
+			table.insert(newTable, c)
+		end
+	end
+	return newTable
+end
+
 local function mergePositionTables(a, b)
 	for _, z in b do
 		if not findPositionTable(a, z) then
@@ -137,41 +147,7 @@ local function mergePositionTables(a, b)
 	end
 end
 
-local function generateChunkRooms(chunkMap,random:Random)
-	local newRooms = {}
-
-
-
-
-	return newRooms
-end
-
---Use a altered form of a* which based on the same connection points, generates the same result. it generates hallways based on distance from every connectionpoint,
---and the starting hallway, if we reach another connectionpoint we create the path that leads to it (influenced by the distance to other entry points, so not shortest per say).
---Then we remove the original starting point and start pathing from the next connectionpoint, ignoring the already connected starting point.
-local function generateChunkHallways(connectionPoints: table)
-	local function calculateCost(x, y, z)
-		local cost = 0
-		for i = z, #connectionPoints do
-			local element = connectionPoints[i]
-
-			local localCost = math.sqrt(math.pow(x - element[1], 2) + math.pow(y - element[2], 2))
-			cost += localCost
-		end
-		return cost
-	end
-
-	local function removeIntersecting(origin, altered) --b - (a n b)
-		local newTable = {}
-		for _, c in altered do
-			if not findPositionTable(origin, c) then
-				table.insert(newTable, c)
-			end
-		end
-		return newTable
-	end
-
-	local function getAdjacentTiles(x, y, z) --return in x,y,prevx,prevy,score format... | Z refers to the iteration.., so we don't calculate score based on previous starting tiles.
+local function getAdjacentTiles(x, y, z) --return in x,y,prevx,prevy,score format... | Z refers to the iteration.., so we don't calculate score based on previous starting tiles.
 		local adjacent = {}
 
 		if x + 1 <= chunkSize then
@@ -193,6 +169,48 @@ local function generateChunkHallways(connectionPoints: table)
 
 		return adjacent
 	end
+
+local function generateChunkRooms(chunkMap,random:Random)
+	local newRooms = {}
+
+	local explored = {}
+	for x,list in chunkMap do 
+		for y,floor in list do
+			if floor["type"] == "Hallway" then
+				table.insert(explored,{x,y})
+			end
+		end
+	end
+
+	local frontier = {}
+	for _,tile in explored do
+		removeIntersecting(frontier,explored)
+		mergePositionTables(frontier,explored)
+	end
+
+	random:NextInt()
+
+
+	return newRooms
+end
+
+--Use a altered form of a* which based on the same connection points, generates the same result. it generates hallways based on distance from every connectionpoint,
+--and the starting hallway, if we reach another connectionpoint we create the path that leads to it (influenced by the distance to other entry points, so not shortest per say).
+--Then we remove the original starting point and start pathing from the next connectionpoint, ignoring the already connected starting point.
+local function generateChunkHallways(connectionPoints: table)
+	local function calculateCost(x, y, z)
+		local cost = 0
+		for i = z, #connectionPoints do
+			local element = connectionPoints[i]
+
+			local localCost = math.sqrt(math.pow(x - element[1], 2) + math.pow(y - element[2], 2))
+			cost += localCost
+		end
+		return cost
+	end
+
+	
+
 
 	local formedHallways = {}
 
