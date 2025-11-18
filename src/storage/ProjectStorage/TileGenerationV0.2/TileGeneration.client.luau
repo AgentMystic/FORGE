@@ -78,10 +78,12 @@ local function getOwnConnections(x, y)
 		["North"] = nil,
 		["West"] = nil,
 	}
-	if OwnRandom:NextNumber() < 0.4 then
+	local northRng = 0.7
+	if OwnRandom:NextNumber() < northRng  then
 		map["North"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
-	if OwnRandom:NextNumber() < 0.4 then
+	local westRng = 0.7
+	if OwnRandom:NextNumber() < westRng then
 		map["West"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
 
@@ -97,10 +99,12 @@ local function getAllConnections(x, y)
 	}
 	local OwnRandom = Random.new(getChunkSeed(x, y))
 
-	if OwnRandom:NextNumber() < 0.4 then
+	local northRng = 0.7
+	if OwnRandom:NextNumber() < northRng  then
 		map["North"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
-	if OwnRandom:NextNumber() < 0.4 then
+	local westRng = 0.7
+	if OwnRandom:NextNumber() < westRng then
 		map["West"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
 	map["South"] = getOwnConnections(x, y - 1)["North"]
@@ -131,6 +135,15 @@ local function mergePositionTables(a, b)
 			table.insert(a, z)
 		end
 	end
+end
+
+local function generateChunkRooms(chunkMap,random:Random)
+	local newRooms = {}
+
+
+
+
+	return newRooms
 end
 
 --Use a altered form of a* which based on the same connection points, generates the same result. it generates hallways based on distance from every connectionpoint,
@@ -203,7 +216,6 @@ local function generateChunkHallways(connectionPoints: table)
 				end
 			end
 			table.remove(possible, findPositionTable(possible, candidate))
-			
 
 			local found = findPositionTable(connectionPoints, candidate)
 			if found and found > z then --if we found an entry chunk not already connected.
