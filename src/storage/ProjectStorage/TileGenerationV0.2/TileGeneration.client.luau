@@ -8,7 +8,7 @@ folder.Parent = workspace
 --may god be with me.
 
 --Configurable parameters
-local loadedChunkRange = 3
+local loadedChunkRange = 0
 local seed = 1
 local chunkSize = 8 --16x16 10x10 tiles
 --Also configurable as long as the corresponding tile rooms are updated.
@@ -61,6 +61,38 @@ local function getChunkSeed(x, y)
 	return combinedSeed
 end
 
+local function getSpaceAdjacent(x, y)
+	local adjacent = {}
+	if x + 1 <= chunkSize then
+		local neighbour = { x + 1, y, 1 } -- right
+		table.insert(adjacent, neighbour)
+	end
+	if x - 1 >= 1 then
+		local neighbour = { x - 1, y, 3 } -- left
+		table.insert(adjacent, neighbour)
+	end
+	if y - 1 >= 1 then
+		local neighbour = { x, y - 1, 2 } -- back 2*90
+		table.insert(adjacent, neighbour)
+	end
+	if y + 1 <= chunkSize then
+		local neighbour = { x, y + 1, 0 } --front
+		table.insert(adjacent, neighbour)
+	end
+	return adjacent -- list of {x,y, and  a number representing the orientation}
+end
+
+local function getNorthWestAdjacent(x, y)
+	local adjacent = {}
+	if x - 1 >= 1 then
+		adjacent["West"] = { x - 1, y } -- left
+	end
+	if y + 1 <= chunkSize then
+		adjacent["North"] = { x, y + 1 } --front
+	end
+	return adjacent -- list of {x,y, and  a number representing the orientation}
+end
+
 --Find a chunk in the given table containing chunks.
 local function findPositionTable(a: table, positionTable: table)
 	for indx, element in a do
@@ -89,63 +121,9 @@ local function getOwnConnections(x, y)
 
 	return map
 end
-
-local function getAllConnections(x, y)
-	local map = {
-		["North"] = nil,
-		["West"] = nil,
-		["South"] = nil,
-		["East"] = nil,
-	}
-	local OwnRandom = Random.new(getChunkSeed(x, y))
-
-	local northRng = 0.7
-	if OwnRandom:NextNumber() < northRng then
-		map["North"] = OwnRandom:NextInteger(2, chunkSize - 1)
-	end
-	local westRng = 0.7
-	if OwnRandom:NextNumber() < westRng then
-		map["West"] = OwnRandom:NextInteger(2, chunkSize - 1)
-	end
-	map["South"] = getOwnConnections(x, y - 1)["North"]
-	map["East"] = getOwnConnections(x + 1, y)["West"]
-
-	return map
-end
-
-local function buildChunk(destination, chunk, chunkMap)
-	print(chunkMap)
-	for x = 1, chunkSize do
-		for y = 1, chunkSize do
-			local room = chunkMap[x][y]
-			if not room then
-				continue
-			end
-			if room.type == "Hallway" then
-				local part = Instance.new("Part")
-				part.Anchored = true
-				part.Size = Vector3.new(tileSize, 1, tileSize)
-				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
-				part.Name = getKey(x, y)	
-			else
-				local part = Instance.new("Part")
-				part.Anchored = true
-				part.Color = Color3.fromRGB(204, 16, 16)
-				part.Size = Vector3.new(tileSize, 1, tileSize)
-				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
-				part.Name = getKey(x, y)	
-			end
-		end
-	end
-end
-
 local function removeIntersecting(origin, altered) --b - (a n b)
 	local newTable = {}
-	for _, c in altered do
+	for _, c in pairs(altered) do
 		if not findPositionTable(origin, c) then
 			table.insert(newTable, c)
 		end
@@ -163,7 +141,7 @@ end
 
 local function copyTable(table) --returns a shallow copy of the corresponding table.
 	local new = {}
-	for a,b in pairs(table) do
+	for a, b in pairs(table) do
 		new[a] = b
 	end
 	return new
@@ -202,26 +180,150 @@ local function getAdjacentTiles(x, y, z, connectionPoints) --return in x,y,prevx
 
 	return adjacent
 end
+local function getAllConnections(x, y)
+	local map = {
+		["North"] = nil,
+		["West"] = nil,
+		["South"] = nil,
+		["East"] = nil,
+	}
+	local OwnRandom = Random.new(getChunkSeed(x, y))
 
-local function getSpaceAdjacent(x, y)
-	local adjacent = {}
-	if x + 1 <= chunkSize then
-		local neighbour = { x + 1, y, 1 } -- right
-		table.insert(adjacent, neighbour)
+	local northRng = 0.7
+	if OwnRandom:NextNumber() < northRng then
+		map["North"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
-	if x - 1 >= 1 then
-		local neighbour = { x - 1, y, 3 } -- left
-		table.insert(adjacent, neighbour)
+	local westRng = 0.7
+	if OwnRandom:NextNumber() < westRng then
+		map["West"] = OwnRandom:NextInteger(2, chunkSize - 1)
 	end
-	if y - 1 >= 1 then
-		local neighbour = { x, y - 1, 2 } -- back 2*90
-		table.insert(adjacent, neighbour)
+	map["South"] = getOwnConnections(x, y - 1)["North"]
+	map["East"] = getOwnConnections(x + 1, y)["West"]
+
+	return map
+end
+
+local function createWall(pos1,pos2,chunk,hasNeighbour,destination)
+
+	local xdif = pos2[1] - pos1[1]
+	local ydif = pos2[2] - pos1[2]
+
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.Size = Vector3.new(tileSize, 20, 1)
+	part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
+					+ Vector3.new(tileSize * (pos1[1] + 0.5 * xdif), 10, tileSize * (pos1[2]+ 0.5 * ydif))
+    part.Parent = destination
+    part.Name = "Wall "..getKey(pos1[1],pos1[2])
+	
+    if math.abs(pos1[1]-pos2[1]) == 1 then
+	part.Rotation = Vector3.new(0,90,0)
 	end
-	if y + 1 <= chunkSize then
-		local neighbour = { x, y + 1, 0 } --front
-		table.insert(adjacent, neighbour)
+end
+
+local function createDoor(pos1,pos2,chunk,chunkMap,destination)
+
+end
+
+local function generateWalls(room, pos,chunk,chunkMap,destination)
+	local shape = room.shape
+	local roomtiles = { pos }
+	if shape then
+		for _, tile in shape do --get every tile in the shape into roomtiles
+			for i = 0, room.rotations do
+				tile[1], tile[2] = tile[2], -tile[1]
+			end
+			table.insert(roomtiles, tile)
+		end
 	end
-	return adjacent -- list of {x,y, and  a number representing the orientation}
+	local hasDoor = false
+	for _, tile in roomtiles do
+		local adjacent = getNorthWestAdjacent(pos[1], pos[2])
+		local west = adjacent["West"]
+		local north = adjacent["North"]
+		adjacent = removeIntersecting(roomtiles, adjacent)
+		
+		--west
+		if west then -- ignore tiles that are roomtiles.
+			if findPositionTable(adjacent,west) then -- if it wasn't removed because it was a fellow room members
+			local neighbour = chunkMap[west[1]][west[2]]
+				if west.type == "Hallway" and not hasDoor then
+					hasDoor = true
+					createDoor(tile,{tile[1]-1,tile[2]},chunk,destination)
+				elseif not (west.type == "Hallway" and room.type == "Hallway") then
+					createWall(tile,{tile[1]-1,tile[2]},chunk,true,destination)
+				end
+			end
+		else
+			createWall(tile,{tile[1]-1,tile[2]},chunk,false,destination)
+		end
+
+		if north then
+			if findPositionTable(adjacent,north) then
+				local neighbour = chunkMap[west[1]][west[2]]
+				if west.type == "Hallway" and not hasDoor then
+					hasDoor = true
+					createDoor(tile,{tile[1],tile[2]+1},chunk,destination)
+				elseif not (north.type == "Hallway" and room.type == "Hallway") then
+					createWall(tile,{tile[1],tile[2]+1},chunk,true,destination)
+				end
+			end
+		else
+			createWall(tile,{tile[1],tile[2]+1},chunk,false,destination)
+		end
+	end
+end
+
+local function buildChunk(destination, chunk, chunkMap)
+	print(chunkMap)
+	for x = 1, chunkSize do
+		for y = 1, chunkSize do
+			local room = chunkMap[x][y]
+			if not room then
+				continue
+			end
+			if room.type == "Hallway" then
+				local part = Instance.new("Part")
+				part.Anchored = true
+				part.Size = Vector3.new(tileSize, 1, tileSize)
+				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
+					+ Vector3.new(tileSize * x, 10, tileSize * y)
+				part.Parent = destination
+				part.Name = getKey(x, y)
+			elseif room.type == "InterviewRoom" then
+				local part = Instance.new("Part")
+				part.Anchored = true
+				part.Color = Color3.fromRGB(16, 113, 204)
+				part.Size = Vector3.new(tileSize, 1, tileSize)
+				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
+					+ Vector3.new(tileSize * x, 10, tileSize * y)
+				part.Parent = destination
+				part.Name = getKey(x, y)
+			elseif room.type == "SingleOffice" then
+				local part = Instance.new("Part")
+				part.Anchored = true
+				part.Color = Color3.fromRGB(151, 16, 204)
+				part.Size = Vector3.new(tileSize, 1, tileSize)
+				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
+					+ Vector3.new(tileSize * x, 10, tileSize * y)
+				part.Parent = destination
+				part.Name = getKey(x, y)
+			else
+				local part = Instance.new("Part")
+				part.Anchored = true
+				part.Color = Color3.fromRGB(204, 16, 16)
+				part.Size = Vector3.new(tileSize, 1, tileSize)
+				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
+					+ Vector3.new(tileSize * x, 10, tileSize * y)
+				part.Parent = destination
+				part.Name = getKey(x, y)
+			end
+
+			if room.eldest == true then
+				generateWalls(room, { x, y },chunk,chunkMap,destination)
+			end
+		end
+	end
 end
 
 local function getFittingRooms(chunkMap: table, tile: table) --returns a room that fits in the chunkmap starting at the corresponding tile.
@@ -233,18 +335,16 @@ local function getFittingRooms(chunkMap: table, tile: table) --returns a room th
 			local rotation = tile[3]
 			local blocked = false
 			for _, space in tpe.shape do
-
 				local rotX = space[1]
 				local rotY = space[2]
-				for i = 1,rotation do
-					rotX,rotY = rotY,-rotX
+				for i = 1, rotation do
+					rotX, rotY = rotY, -rotX
 				end
 				--FUCK so the space is outside of the chunk with the corresponding rotation
-				if x+rotX < 1 or x+rotX> chunkSize or y+rotY < 1 or y+rotY > chunkSize then
+				if x + rotX < 1 or x + rotX > chunkSize or y + rotY < 1 or y + rotY > chunkSize then
 					blocked = true
 					break
 				end
-				print(x,rotX,y,rotY)
 				if chunkMap[x + rotX][y + rotY] ~= nil then
 					blocked = true
 				end
@@ -258,7 +358,7 @@ local function getFittingRooms(chunkMap: table, tile: table) --returns a room th
 	return choices
 end
 
-local function addRoom(chunkMap, tile, room) 
+local function addRoom(chunkMap, tile, room)
 	local x = tile[1]
 	local y = tile[2]
 	local rotation = tile[3]
@@ -269,17 +369,16 @@ local function addRoom(chunkMap, tile, room)
 	copy.eldest = true
 	copy.rotation = rotation
 	chunkMap[x][y] = copy
-	table.insert(occupation,{x,y})
+	table.insert(occupation, { x, y })
 	if shape then
-		for _,space in shape do
+		for _, space in shape do
 			local rotX = space[1]
 			local rotY = space[2]
-			for i = 1,rotation do
-			rotX,rotY = rotY,-rotX
+			for i = 1, rotation do
+				rotX, rotY = rotY, -rotX
 			end
-
-			chunkMap[x+rotX][y+rotY] = room
-			table.insert(occupation,{x+rotX,y+rotY})
+			chunkMap[x + rotX][y + rotY] = room
+			table.insert(occupation, { x + rotX, y + rotY })
 		end
 	end
 	return occupation
@@ -294,7 +393,6 @@ local function generateChunkRooms(chunkMap, random: Random)
 			end
 		end
 	end
-
 	local frontier = {}
 	for _, tile in explored do --for every hallway
 		local adjacent = getSpaceAdjacent(tile[1], tile[2])
@@ -303,17 +401,24 @@ local function generateChunkRooms(chunkMap, random: Random)
 		mergePositionTables(frontier, adjacent)
 	end --add every tile next to a hallway which isn't a hallway to a frontier list, for each tile there we want it to at least be generated as a room.
 
-	print(#frontier.." is the amount of adjacent spaces next to hallways?")
+	local placedRooms = {}
 	--possibly add its relativitiy to the hallway, if its to the left right front back? so we can use rotation, we only need the first, dont think this will cause bias?
 	while #frontier > 0 do --there are spaces left to fill.
-		print(frontier)
+		
 		local tile = frontier[1]
-		local roomTypes = getFittingRooms(chunkMap, tile) -- how do we figure out if the room type occupise another frontier? 
-		local occupation = addRoom(chunkMap, tile, roomTypes[random:NextInteger(1, #roomTypes)]) --what tiles the room will occupy will be returned? 
-		frontier = removeIntersecting(occupation,frontier) --remove any occupied tiles from the frontier. 
+		local roomTypes = getFittingRooms(chunkMap, tile) -- how do we figure out if the room type occupise another frontier?
+		local roomtp = roomTypes[random:NextInteger(1, #roomTypes)]
+		local occupation = addRoom(chunkMap, tile, roomtp) --what tiles the room will occupy will be returned?
+		if roomtp.type == "Hallway" then
+			local adjacent = getSpaceAdjacent(tile[1], tile[2])
+			adjacent = removeIntersecting(explored, adjacent) --avoid explored tiles being in the adjacent list
+			adjacent = removeIntersecting(frontier, adjacent) --avoid frontier tiles from being duped.
+			adjacent = removeIntersecting(placedRooms, adjacent)
+			mergePositionTables(frontier, adjacent)
+		end
+		mergePositionTables(placedRooms, occupation)
+		frontier = removeIntersecting(occupation, frontier) --remove any occupied tiles from the frontier.
 	end
-
-
 
 	return chunkMap
 end
@@ -321,7 +426,7 @@ end
 --Use a altered form of a* which based on the same connection points, generates the same result. it generates hallways based on distance from every connectionpoint,
 --and the starting hallway, if we reach another connectionpoint we create the path that leads to it (influenced by the distance to other entry points, so not shortest per say).
 --Then we remove the original starting point and start pathing from the next connectionpoint, ignoring the already connected starting point.
-local function generateChunkHallways(connectionPoints: table)
+local function generateChunkHallways(connectionPoints: table) --interesting
 	--Calculate the cost.. should update to not use magnitude.
 
 	local formedHallways = {}
@@ -367,7 +472,6 @@ local function generateChunkHallways(connectionPoints: table)
 			mergePositionTables(possible, adjacent)
 		end
 	end
-	
 	return formedHallways
 end
 
@@ -423,10 +527,11 @@ local function syncLoadChunk(x: IntValue, y: IntValue) --we seem to start at chu
 	for _, tile in newHallwayTiles do
 		chunkMap[tile[1]][tile[2]] = defaultTiles["Hallway"]
 	end
-
 	local newRooms = generateChunkRooms(chunkMap, rand)
+
 	--hm for hallway generation. use some type of a* with bias towards any opening. and maybe randomly generate one or two other endpoints with bias near the middle to add randomness
 	--now we have all respective connections, with their position so now we generate the hallways. through rand
+	print("Chunkmap before generating: ?", chunkMap)
 	buildChunk(chunkFolder, { x, y }, chunkMap) --build the chunks
 end
 
