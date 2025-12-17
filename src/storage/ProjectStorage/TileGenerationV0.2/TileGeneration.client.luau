@@ -1,16 +1,16 @@
 --by mys.tic
 print("Tile Generation Started!!!!!")
-task.wait(1)
 local folder = Instance.new("Folder")
 folder.Name = "ChunkGeneration"
 folder.Parent = workspace
 
---may god be with me.
+--may god be with me. --god answered
 
 --Configurable parameters
-local loadedChunkRange = 1 --
-local seed = 1
-local chunkSize = 8 --16x16 10x10 tiles
+local loadedChunkRange = 2 --
+local seed = 2
+local chunkSize = 8 --16x16 0x0 tiles
+local ContextActionService = game:GetService("ContextActionService")
 --Also configurable as long as the corresponding tile rooms are updated.
 local tileSize = 10 --studs
 
@@ -58,13 +58,16 @@ local defaultTiles = {
 	},
 
 	["Corner"] = {
-		type = "Cafeteria",
+		type = "Corner",
 		rotations = 0,
 		eldest = false,
 		shape = { { 1, 0 }, { 0, 1 } },
 		hasDoor = false,
 	},
 }
+
+
+
 
 --procedural infinity
 
@@ -122,8 +125,7 @@ local function findPositionTable(a: table, positionTable: table)
 	for indx, element in a do
 		if element[1] == positionTable[1] and element[2] == positionTable[2] then
 			return indx
-		end
-		task.wait() --temporary cause execution time is being exhausted.
+		end 
 	end
 	return false
 end
@@ -234,8 +236,9 @@ local function createWall(pos1, pos2, chunk, destination)
 	local part = Instance.new("Part")
 	part.Anchored = true
 	part.Size = Vector3.new(tileSize, 20, 1)
+	part.Material = Enum.Material.SmoothPlastic
 	part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-		+ Vector3.new(tileSize * (pos1[1] + 0.5 * xdif), 10, tileSize * (pos1[2] + 0.5 * ydif))
+		+ Vector3.new(tileSize * (pos1[1] + 0.5 * xdif), 0, tileSize * (pos1[2] + 0.5 * ydif))
 	part.Parent = destination
 	part.Name = "Wall " .. getKey(pos1[1], pos1[2])
 
@@ -251,9 +254,12 @@ local function createDoor(pos1, pos2, chunk, destination)
 	local part = Instance.new("Part")
 	part.Anchored = true
 	part.Size = Vector3.new(tileSize, 20, 1)
+	part.Transparency = 0.5
+	part.CanCollide = false
+	part.Material = Enum.Material.SmoothPlastic
 	part.Color = Color3.new(0.121568, 0.117647, 0.117647)
 	part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-		+ Vector3.new(tileSize * (pos1[1] + 0.5 * xdif), 10, tileSize * (pos1[2] + 0.5 * ydif))
+		+ Vector3.new(tileSize * (pos1[1] + 0.5 * xdif), 0, tileSize * (pos1[2] + 0.5 * ydif))
 	part.Parent = destination
 	part.Name = "Door " .. getKey(pos1[1], pos1[2])
 
@@ -263,7 +269,6 @@ local function createDoor(pos1, pos2, chunk, destination)
 end
 
 local function generateWalls(room, pos, chunk, chunkMap, destination)
-
 	if not room then
 		if pos[1] == 1 then
 			createWall(pos, { pos[1] - 1, pos[2] }, chunk, destination)
@@ -310,11 +315,11 @@ local function generateWalls(room, pos, chunk, chunkMap, destination)
 							neighbour.hasDoor = true
 							createDoor(tile, { tile[1] - 1, tile[2] }, chunk, destination)
 						else --todo
-							print(connectW, " === "..tile[1].." and "..tile[2])
 							createWall(tile, { tile[1] - 1, tile[2] }, chunk, destination)
 						end
 					end
 				elseif room.eldest and not room.hasDoor and room.rotations == 1 then
+					room.hasDoor = true
 					createDoor(tile, { tile[1] - 1, tile[2] }, chunk, destination)
 				else
 					createWall(tile, { tile[1] - 1, tile[2] }, chunk, destination)
@@ -335,11 +340,11 @@ local function generateWalls(room, pos, chunk, chunkMap, destination)
 							neighbour.hasDoor = true
 							createDoor(tile, { tile[1], tile[2] + 1 }, chunk, destination)
 						else
-							print(connectN, " === "..tile[1].." and "..tile[2])
 							createWall(tile, { tile[1], tile[2] + 1 }, chunk, destination)
 						end
 					end
 				elseif room.eldest and not room.hasDoor and room.rotations == 2 then
+					room.hasDoor = true
 					createDoor(tile, { tile[1], tile[2] + 1 }, chunk, destination)
 				else
 					createWall(tile, { tile[1], tile[2] + 1 }, chunk, destination)
@@ -362,14 +367,15 @@ local function generateWalls(room, pos, chunk, chunkMap, destination)
 end
 
 local function buildChunk(destination, chunk, chunkMap)
-	print(chunkMap)
+	local model = Instance.new("Model")
+	model.Name = chunk[1] .. " , " .. chunk[2]
 	for x = 1, chunkSize do
 		for y = 1, chunkSize do
 			local room = chunkMap[x][y]
 
 			if not room then
 				if x == 1 or y == chunkSize then
-					generateWalls(room, { x, y }, chunk, chunkMap, destination)
+					generateWalls(room, { x, y }, chunk, chunkMap, model)
 				end
 				continue
 			end
@@ -377,63 +383,71 @@ local function buildChunk(destination, chunk, chunkMap)
 			if room.type == "Hallway" then
 				local part = Instance.new("Part")
 				part.Anchored = true
+				part.Color = Color3.fromRGB(170, 172, 173)
+				part.Material = Enum.Material.SmoothPlastic
 				part.Size = Vector3.new(tileSize, 1, tileSize)
 				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
+					+ Vector3.new(tileSize * x, 0, tileSize * y)
+				part.Parent = model
 				part.Name = getKey(x, y)
 			elseif room.type == "InterviewRoom" then
 				local part = Instance.new("Part")
 				part.Anchored = true
-				part.Color = Color3.fromRGB(16, 113, 204)
+				part.Color = Color3.fromRGB(4, 07, 202)
+				part.Material = Enum.Material.SmoothPlastic
 				part.Size = Vector3.new(tileSize, 1, tileSize)
 				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
+					+ Vector3.new(tileSize * x, 0, tileSize * y)
+				part.Parent = model
 				part.Name = getKey(x, y)
 			elseif room.type == "SingleOffice" then
 				local part = Instance.new("Part")
 				part.Anchored = true
-				part.Color = Color3.fromRGB(151, 16, 204)
+				part.Color = Color3.fromRGB(113, 7, 155)
+				part.Material = Enum.Material.SmoothPlastic
 				part.Size = Vector3.new(tileSize, 1, tileSize)
 				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
+					+ Vector3.new(tileSize * x, 0, tileSize * y)
+				part.Parent = model
 				part.Name = getKey(x, y)
 			elseif room.type == "Cafeteria" then
 				local part = Instance.new("Part")
 				part.Anchored = true
-				part.Color = Color3.fromRGB(185, 204, 16)
+				part.Color = Color3.fromRGB(204, 16, 16)
+				part.Material = Enum.Material.SmoothPlastic
 				part.Size = Vector3.new(tileSize, 1, tileSize)
 				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
+					+ Vector3.new(tileSize * x, 0, tileSize * y)
+				part.Parent = model
 				part.Name = getKey(x, y)
 			elseif room.type == "Corner" then
 				local part = Instance.new("Part")
 				part.Anchored = true
-				part.Color = Color3.fromRGB(16, 191, 204)
+				part.Color = Color3.fromRGB(30, 131, 5)
+				part.Material = Enum.Material.SmoothPlastic
 				part.Size = Vector3.new(tileSize, 1, tileSize)
 				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
+					+ Vector3.new(tileSize * x, 0, tileSize * y)
+				part.Parent = model
 				part.Name = getKey(x, y)
 			else
 				local part = Instance.new("Part")
 				part.Anchored = true
 				part.Color = Color3.fromRGB(204, 16, 16)
+				part.Material = Enum.Material.SmoothPlastic
 				part.Size = Vector3.new(tileSize, 1, tileSize)
 				part.Position = chunkSize * tileSize * Vector3.new(chunk[1], 0, chunk[2])
-					+ Vector3.new(tileSize * x, 10, tileSize * y)
-				part.Parent = destination
+					+ Vector3.new(tileSize * x, 0, tileSize * y)
+				part.Parent = model
 				part.Name = getKey(x, y)
 			end
 
 			if room.eldest == true then
-				generateWalls(room, { x, y }, chunk, chunkMap, destination)
+				generateWalls(room, { x, y }, chunk, chunkMap, model)
 			end
 		end
 	end
+	model.Parent = destination
 end
 
 local function getFittingRooms(chunkMap: table, tile: table) --returns a room that fits in the chunkmap starting at the corresponding tile.
@@ -548,11 +562,14 @@ local function generateChunkHallways(connectionPoints: table) --interesting
 
 		table.insert(searched, currentStart)
 		mergePositionTables(possible, adjacent)
-
+		local t1 = os.clock()
+		local s = 0
 		while true do
+			s += 1
+			local tx = os.clock()
 			local lowestCost = possible[1][5]
 			local candidate = possible[1]
-
+			
 			for _, entry in possible do
 				if entry[5] < lowestCost then
 					lowestCost = entry[5]
@@ -562,8 +579,10 @@ local function generateChunkHallways(connectionPoints: table) --interesting
 			table.remove(possible, findPositionTable(possible, candidate))
 
 			local found = findPositionTable(connectionPoints, candidate)
+			local ta = os.clock()
 			if found and found > z then --if we found an entry chunk not already connected.
 				--ADD the hallway connection to the formedhallways
+
 				local path = candidate
 				local newHalls = {}
 				repeat
@@ -575,18 +594,22 @@ local function generateChunkHallways(connectionPoints: table) --interesting
 
 				break
 			end
+			local tb = os.clock()
 			table.insert(searched, candidate)
 			adjacent = getAdjacentTiles(candidate[1], candidate[2], z, connectionPoints)
 			adjacent = removeIntersecting(searched, adjacent)
 			mergePositionTables(possible, adjacent)
+			local ty = os.clock()
 		end
+		local t2 = os.clock()
 	end
 	return formedHallways
 end
 
 local function syncLoadChunk(x: IntValue, y: IntValue) --we seem to start at chunk -1,-1
+	local t0 = os.clock()
 	table.insert(loadedChunks, { x, y })
-	print("Started loading chunk " .. x .. " " .. y)
+	print("Started loading chunk " .. x .. "," .. y)
 	local chunkMap = {}
 	for t = 1, chunkSize do
 		chunkMap[t] = {}
@@ -636,12 +659,18 @@ local function syncLoadChunk(x: IntValue, y: IntValue) --we seem to start at chu
 	for _, tile in newHallwayTiles do
 		chunkMap[tile[1]][tile[2]] = defaultTiles["Hallway"]
 	end
+
+	local t1 = os.clock()
+	print("Time taken to generate hallways: " .. t1 - t0)
 	local newRooms = generateChunkRooms(chunkMap, rand)
 
 	--hm for hallway generation. use some type of a* with bias towards any opening. and maybe randomly generate one or two other endpoints with bias near the middle to add randomness
 	--now we have all respective connections, with their position so now we generate the hallways. through rand
-
+	local t2 = os.clock()
+	print("Time taken to generate rooms: " .. t2 - t1)
 	buildChunk(chunkFolder, { x, y }, chunkMap) --build the chunks
+	local t3 = os.clock()
+	print("Time taken to build the chunk:" .. t3 - t2)
 end
 
 --cant we syncunloadchunk = coroutine.wrap()
@@ -657,12 +686,25 @@ local function syncUnloadChunk(x: IntValue, y: IntValue)
 	if child then
 		child:Destroy()
 	end
-	table.remove(loadedChunks, findPositionTable(loadedChunks, { x, y }))
+	local position = findPositionTable(loadedChunks, { x, y })
+	if not position then
+		return
+	end
+	table.remove(loadedChunks,position)
 end
 
 local function asyncUnloadChunk(x, y)
 	local thread = coroutine.wrap(syncUnloadChunk)
 	thread(x, y)
+end
+
+local function unloadAllChunks()
+	for _,chunk in pairs(folder:GetChildren()) do
+		local Splt = string.split(chunk.Name,",")
+	
+		syncUnloadChunk(tonumber(Splt[1]),tonumber(Splt[2]))
+		
+	end
 end
 
 local function getChunksToUnload(currentChunk: table | nil): table
@@ -723,11 +765,21 @@ local function getChunksToLoad(currentChunk: table | nil): table
 	return chunksToLoad
 end
 
+local lock = false
+ContextActionService:BindAction("ReloadSeed",function(name,state)
+	if Enum.UserInputState.Begin == state and  not lock then
+		lock = true
+		seed = math.random(1,999999999)
+		print("GENERATING WITH NEW SEED: "..seed)
+		unloadAllChunks()
+		lock = false
+	end
+end,true,Enum.KeyCode.R)
+
 --Create a thread to run the chunkloading routine.
 local chunkLoadingThread = coroutine.wrap(function()
 	while true do
-		task.wait(2)
-
+		task.wait(.1)
 		local character = player.Character or nil
 		if not character then
 			continue
@@ -743,11 +795,8 @@ local chunkLoadingThread = coroutine.wrap(function()
 			math.floor(currentPosition.X / (chunkSize * tileSize)),
 			math.floor(currentPosition.Z / (chunkSize * tileSize)),
 		}
-		if lastChunk[1] == currentChunk[1] and lastChunk[2] == currentChunk[2] then
-			continue
-		end
 
-		local hasMoved = not (lastChunk[1] == currentChunk[1] and lastChunk[2] == currentChunk[2])
+		local hasMoved =  true --not (lastChunk[1] == currentChunk[1] and lastChunk[2] == currentChunk[2])
 
 		--now the madness descends
 
@@ -758,12 +807,18 @@ local chunkLoadingThread = coroutine.wrap(function()
 
 			local toUnload = getChunksToUnload()
 			for _, chunk in toUnload do
-				asyncUnloadChunk(chunk[1], chunk[2])
+				local t1 = os.clock()
+				syncUnloadChunk(chunk[1], chunk[2])
+				local t2 = os.clock() 
+				print(t2-t1.. " seconds to unload chunk: "..chunk[1]..","..chunk[2])
 			end
 
 			local toLoad = getChunksToLoad()
 			for _, chunk in toLoad do
-				asyncLoadChunk(chunk[1], chunk[2])
+				local t1 = os.clock()
+				syncLoadChunk(chunk[1], chunk[2])
+				local t2 = os.clock()
+				print(t2-t1.." seconds to load chunk: "..chunk[1]..","..chunk[2])
 			end
 		end
 	end
