@@ -15,12 +15,13 @@ local ShiftService = {}
 
 ShiftService.Projects = {
 
-    ["Tile Generation"] = "TileGenerationV0.2" ;
-    ["FP Camera"] = "FPCameraV0.1"
+    ["Tile Generation"] = "TileGenerationV1.0" ;
+    ["FP Camera"] = "FPCameraV0.1";
+    ["Pathfinding"] = "PathfindingV0.1"
 
 }
 
-ShiftService.Loaded = {"Tile Generation"}
+ShiftService.Loaded = {"Pathfinding"}
 
 
 
