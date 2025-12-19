@@ -2,7 +2,7 @@ local static = {}
 
 static.__index = static
 
-function static:length(self)
+function static:length()
     return #self.Nodes
 end
 

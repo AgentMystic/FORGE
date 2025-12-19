@@ -6,12 +6,26 @@ local object = nil
 
 local path
 
+--Inserts an array of values b into array a, keeping the cost order of array a.
+local function InsertOnCost(a,b) --binarysearching? 
+    for _,element in b do
+        
+    end
+
+
+end
 
 main.__index = main
-function main:createPath(self,a : IntValue, b : IntValue) : Object --Unfortunately Roblox's own path class will always overwrite mine.
+function main:createPath(self,a : Vector3, b : Vector3) : Object --Unfortunately Roblox's own path class will always overwrite mine.
+    local diagCost = math.sqrt(2)
     
+    local searching = true
 
+    local possible = {} --keep sorted on costs.
 
+    while searching do
+        
+    end
 
 
 end
